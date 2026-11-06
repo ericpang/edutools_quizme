@@ -431,12 +431,12 @@ export function finalView({ S, room }) {
       const cal = calibration(played.map((r) => ({ category: r.res.category, pct: r.out.pct, ok: r.out.ok })));
       if (!cal) return;
       const said = { over: 'a little overconfident: you bet more than you earned', under: 'a little underconfident: you could have risked more', calibrated: 'well calibrated: your wagers matched your results' };
-      const bar = (label, value, cls) => h('span', { class: 'cal-bar' }, h('span', { class: `cal-fill ${cls}`, style: `width: ${value}%` }), h('span', { class: 'cal-val num' }, `${label} ${value}%`));
+      const bar = (label, value, cls) => h('span', { class: 'cal-line' }, h('span', { class: 'cal-k' }, label), h('span', { class: 'cal-track' }, h('span', { class: `cal-fill ${cls}`, style: `width: ${value}%` })), h('span', { class: 'cal-val num' }, `${value}%`));
       const agree = isGroup(S) ? played.filter((r) => r.vote?.v !== undefined && r.ans && r.vote.v === r.ans.v).length : null;
       const voted = isGroup(S) ? played.filter((r) => r.vote?.v !== undefined).length : 0;
       fill(report, 
         h('h2', { class: 'sub' }, 'How well did your wagers match your results?'),
-        h('p', {}, `Overall you wagered ${cal.overall.wager}% on average and were right ${cal.overall.accuracy}% of the time: ${said[cal.overall.verdict]}.`),
+        h('p', {}, `Overall you wagered ${cal.overall.wager}% on average and were right ${cal.overall.accuracy}% of the time. That is ${said[cal.overall.verdict]}.`),
         h('ul', { class: 'cal-list' }, cal.categories.map((c) => h('li', { class: 'cal-row' }, h('span', { class: 'cal-cat' }, c.category, h('small', {}, ` ${c.n} question${c.n === 1 ? '' : 's'}`)), bar('Wagered', c.wager, 'is-wager'), bar('Right', c.accuracy, 'is-right')))),
         agree !== null && voted > 0 && h('p', { class: 'muted' }, `Your answer vote matched your group’s choice on ${agree} of ${voted} questions.`),
         h('p', { class: 'muted small' }, 'Wagering about as much as you are often right is what calibrated confidence looks like.'),

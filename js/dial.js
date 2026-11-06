@@ -1,22 +1,8 @@
 // The stake dial: the control that makes a wager feel like one. A ruler-style slider whose colour runs from cool to hot
-// with the risk, and a two-column ledger underneath: what the wager wins if right, and what it costs if wrong.
+// with the risk (css/style.css derives it from --p, the wager, through the theme's ramp), and a two-column ledger
+// underneath: what the wager wins if right, and what it costs if wrong.
 import { breakEven, multiplier, stakes } from './scoring.js';
 import { fmt, h, signed } from './ui.js';
-
-// ice -> amber -> vermilion, matching --ice, --amber and --vermilion in css/style.css
-const STOPS = [
-  [0, [143, 227, 238]],
-  [50, [255, 209, 102]],
-  [100, [255, 93, 93]],
-];
-
-export function riskColor(pct) {
-  const p = Math.min(100, Math.max(0, Number(pct) || 0));
-  const [from, to] = p <= 50 ? [STOPS[0], STOPS[1]] : [STOPS[1], STOPS[2]];
-  const t = (p - from[0]) / (to[0] - from[0]);
-  const [r, g, b] = from[1].map((v, i) => Math.round(v + (to[1][i] - v) * t));
-  return `rgb(${r} ${g} ${b})`;
-}
 
 const TOKENS = { dd: 'Double Down', sh: 'Shield' };
 
@@ -53,7 +39,7 @@ export function createDial({ score, difficulty, max = 100, value = 0, token = nu
     const shielded = model.token === 'sh';
     const win = doubled ? s.ifRightDouble : s.ifRight;
 
-    el.style.setProperty('--risk', riskColor(v));
+    el.style.setProperty('--p', String(v)); // the stylesheet turns the wager into a colour on the theme's ramp
     el.style.setProperty('--at-r', String(breakEven(model.difficulty) / 100)); // where the break-even marker sits
     pct.textContent = `${v}%`;
     stakeLine.replaceChildren('Staking ', h('b', {}, fmt(s.wager)), ` of ${fmt(model.score)} points`);

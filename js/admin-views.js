@@ -20,7 +20,7 @@ const groupBadge = (id) => h('span', { class: 'group-badge', style: `--group: ${
 export function lobbyScreen({ A, host }) {
   const group = isGroup(host.state);
   const qr = h('div', { class: 'qr', id: 'qr', role: 'img', 'aria-label': 'QR code to join the game' });
-  if (window.QRCode) new window.QRCode(qr, { text: A.joinUrl, width: 220, height: 220, colorDark: '#0d3b45', colorLight: '#eef5f2', correctLevel: window.QRCode.CorrectLevel.M });
+  if (window.QRCode) new window.QRCode(qr, { text: A.joinUrl, width: 220, height: 220, colorDark: '#000000', colorLight: '#ffffff', correctLevel: window.QRCode.CorrectLevel.M });
 
   const roster = h('ul', { class: 'roster', id: 'roster' });
   const heading = h('h2', { class: 'sub', id: 'rosterHead' });
@@ -118,6 +118,7 @@ export function answerScreen() {
       const { cur } = state;
       count.textContent = `Question ${cur.n} of ${cur.total} · ${cur.category}`;
       question.textContent = cur.text;
+      question.dataset.len = cur.text.length > 200 ? 'xl' : cur.text.length > 110 ? 'long' : 'short';
       if (built !== cur.qid) {
         built = cur.qid;
         fill(options, cur.options.map(optionTile));

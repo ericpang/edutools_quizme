@@ -39,7 +39,7 @@ const errors = [];
 const pages = []; // [label, page] for every page opened, so a failure can show what each one looked like
 let roomCode = null;
 
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
 
 for (const event of ['uncaughtException', 'unhandledRejection']) {
   process.on(event, async (err) => {
@@ -60,6 +60,16 @@ async function open(url, viewport, label) {
   pages.push([label, page]);
   page.setDefaultTimeout(20000);
   await page.setViewport(viewport);
+  await page.evaluateOnNewDocument(() => {
+    window.__sounds = 0; // oscillators created so far
+    const Audio = window.AudioContext ?? window.webkitAudioContext;
+    if (!Audio) return;
+    const create = Audio.prototype.createOscillator;
+    Audio.prototype.createOscillator = function (...args) {
+      window.__sounds++;
+      return create.apply(this, args);
+    };
+  });
   page.on('pageerror', (e) => errors.push(`${label} pageerror: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && errors.push(`${label} console: ${m.text()}`));
   await page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -83,6 +93,14 @@ const setDial = (page, pct) =>
     pct,
   );
 const letters = 'ABCD';
+const fits = async (page, what) => {
+  await page.setViewport({ width: 1366, height: 768 });
+  const over = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  await page.setViewport(big);
+  check(`the ${what} screen fits a 1366x768 projector without scrolling`, over <= 1, `${over}px over`);
+};
+const sounds = (page) => page.evaluate(() => window.__sounds);
+let mutedAt = 0;
 
 // ---------------------------------------------------------------- the host sets up a game
 async function hostSetup({ group = false, questions = 3 }) {
@@ -121,6 +139,7 @@ console.log('\n--- solo game');
   check('host gets a 6-character code', true, code);
   await admin.waitForSelector('#qr canvas, #qr img');
   check('QR code is drawn', true);
+  check('black is the default theme', (await admin.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor].join())) === 'black,rgb(0, 0, 0)');
   const meta = await rest(`quizzes/${code}/meta`);
   check('game exists with the host as owner', !!meta?.owner && meta.mode === 'solo' && meta.open === true && meta.maxWager === 100);
   const stored = await rest(`quizzes/${code}/quiz`);
@@ -144,6 +163,7 @@ console.log('\n--- solo game');
   await setDial(ana, 50);
   await shot(ana, 's-phone-2-bid');
   await shot(admin, 's-host-3-bid');
+  await fits(admin, 'wager');
   await click(ana, '#lockBtn');
   await setDial(ben, 20);
   await click(ben, '#lockBtn');
@@ -157,6 +177,12 @@ console.log('\n--- solo game');
   for (const p of [ana, ben, cleo]) await p.waitForSelector('.option');
   check('the question appears once everyone has bid', (await text(ana, '.q-text')).includes('ATP'));
   await shot(admin, 's-host-4-answer');
+  await fits(admin, 'question');
+  check('the question fanfare plays on the host when the question appears', (await sounds(admin)) > 0, `${await sounds(admin)} notes`);
+  check('phones stay quiet', (await sounds(ana)) === 0);
+  const stung = await sounds(admin);
+  await admin.waitForFunction((n) => window.__sounds > n + 12, { timeout: 8000 }, stung); // only the music can add this many notes
+  check('the music keeps playing on the host while the clock runs on the question', true);
   const pick = async (page, i) => {
     await page.$$eval('.options .option', (els, k) => els[k].click(), i);
     await click(page, '#lockBtn');
@@ -173,12 +199,16 @@ console.log('\n--- solo game');
   await cleo.$eval('[data-bet="none"]', (e) => e.click());
 
   // everyone answered and settled their side-bet: the host reveals
-  await ana.waitForSelector('.verdict');
+  for (const p of [ana, ben, cleo]) await p.waitForSelector('.verdict');
   check('reveal shows the verdict on each phone', (await text(ana, '.verdict')) === 'Right' && (await text(ben, '.verdict')) === 'Wrong' && (await text(cleo, '.verdict')) === 'Right');
   await sleep(1500); // let the balance count up
   await shot(ana, 's-phone-4-reveal-right');
   await shot(ben, 's-phone-4-reveal-wrong');
   await shot(admin, 's-host-5-reveal');
+  await fits(admin, 'reveal');
+  const revealed = await sounds(admin);
+  await sleep(1200);
+  check('the music stops when the answer is revealed', (await sounds(admin)) === revealed, `${revealed} then ${await sounds(admin)}`);
   const score = await rest(`quizzes/${code}/score`);
   check('scores follow the rules (right +600 x2 +50 bet, wrong -200 -50, right +100 x2)', score[uid.Ana].pts === 2250 && score[uid.Ben].pts === 750 && score[uid.Cleo].pts === 1200, `${score[uid.Ana].pts} / ${score[uid.Ben].pts} / ${score[uid.Cleo].pts}`);
   check('balance on the phone matches', (await text(ana, '#balance')).replace(/\D/g, '') === '2250');
@@ -188,9 +218,14 @@ console.log('\n--- solo game');
   await admin.waitForSelector('.board-row');
   check('projector lists the top players', (await admin.$$eval('.board-name', (n) => n.map((e) => e.textContent))).join() === 'Ana,Cleo,Ben');
   await shot(admin, 's-host-6-standings');
-  await ben.waitForSelector('.panel.perk');
+  await fits(admin, 'standings');
+  await click(admin, '#soundBtn'); // sound off for question 2
+  mutedAt = await sounds(admin);
+  check('the sound switch reads "Sound off"', (await text(admin, '#soundBtn')).includes('off') && (await admin.$eval('#soundBtn', (e) => e.getAttribute('aria-pressed'))) === 'false');
+  await ben.waitForSelector('.panel.perk:not([hidden])');
+  await ana.waitForSelector('.rank-line');
   check('the player in last place unlocks a Safety Net token', true);
-  check('players in front do not', !(await ana.$('.panel.perk')));
+  check('players in front do not', !(await ana.$('.panel.perk:not([hidden])')));
   await shot(ben, 's-phone-5-standings-token');
 
   // ---- question 2 (World geography, easy, answer C): Ben spends a Shield on a full wager and loses
@@ -215,6 +250,9 @@ console.log('\n--- solo game');
     await p.$eval('[data-bet="none"]', (e) => e.click());
   }
   await ben.waitForSelector('.verdict');
+  check('with the sound off, the next question is silent', (await sounds(admin)) === mutedAt, `${await sounds(admin)} vs ${mutedAt}`);
+  await click(admin, '#soundBtn');
+  check('turning the sound back on plays a preview', (await sounds(admin)) > mutedAt);
   const score2 = await rest(`quizzes/${code}/score`);
   check('a Shield makes a wrong full wager free', score2[uid.Ben].pts === 750, score2[uid.Ben].pts);
   check('the token is marked as spent', (await rest(`quizzes/${code}/perk/${uid.Ben}`)).used === true);
@@ -223,12 +261,24 @@ console.log('\n--- solo game');
 
   // ---- question 3, then the end
   await click(admin, '#nextBtn'); // standings
+  await admin.waitForSelector('.board-row');
   await click(admin, '#nextBtn'); // question 3
+  await hasText(admin, '.p-cat', 'Chemistry');
   for (const p of [ana, ben, cleo]) await p.waitForSelector('.dial-range');
   await click(admin, '#nextBtn'); // skip the bids: the host can move on at any time
+  await admin.waitForSelector('.p-question');
   for (const p of [ana, ben, cleo]) await p.waitForSelector('.option');
+  // the switch works in the middle of a question: off silences the music, on brings it back
+  await click(admin, '#soundBtn');
+  const hushed = await sounds(admin);
+  await sleep(800);
+  check('switching the sound off in the middle of a question silences the music', (await sounds(admin)) === hushed, `${hushed} then ${await sounds(admin)}`);
+  await click(admin, '#soundBtn');
+  await admin.waitForFunction((n) => window.__sounds > n + 25, { timeout: 8000 }, hushed); // the preview is 11 notes; the rest is the music
+  check('...and switching it back on brings the music back', true);
   await pick(ana, 0);
   await click(admin, '#nextBtn'); // reveal
+  await admin.waitForSelector('.p-verdict');
   await cleo.waitForSelector('.verdict');
   check('someone who did not answer sees "No answer"', (await text(cleo, '.verdict')) === 'No answer');
   await click(admin, '#nextBtn'); // standings (last question)
@@ -237,6 +287,7 @@ console.log('\n--- solo game');
   await admin.waitForSelector('.podium');
   check('podium shows the top three', (await admin.$$eval('.podium-col', (c) => c.length)) === 3);
   await shot(admin, 's-host-7-final');
+  await fits(admin, 'podium');
   await ana.waitForSelector('.cal-list');
   check('players get a calibration report', (await ana.$$eval('.cal-row', (r) => r.length)) >= 1);
   await shot(ana, 's-phone-8-final');
@@ -249,6 +300,20 @@ console.log('\n--- solo game');
   await admin.reload({ waitUntil: 'domcontentloaded' });
   await admin.waitForSelector('.podium');
   check('a refreshed host page resumes the game', true);
+
+  // ---- themes
+  await admin.$eval('input[name="theme"][value="light"]', (e) => e.click());
+  check('the host can switch to the light theme', (await admin.evaluate(() => getComputedStyle(document.body).backgroundColor)) === 'rgb(245, 246, 243)');
+  await shot(admin, 's-host-8-final-light');
+  await admin.reload({ waitUntil: 'domcontentloaded' });
+  await admin.waitForSelector('.podium');
+  check('the theme is remembered after a refresh', (await admin.evaluate(() => document.documentElement.dataset.theme)) === 'light');
+  await admin.$eval('input[name="theme"][value="spruce"]', (e) => e.click());
+  await shot(admin, 's-host-9-final-spruce');
+  await admin.$eval('input[name="theme"][value="black"]', (e) => e.click());
+  await ana.$eval('input[name="theme"][value="light"]', (e) => e.click());
+  await shot(ana, 's-phone-9-final-light');
+  await ana.$eval('input[name="theme"][value="black"]', (e) => e.click());
 
   // ---- ending the game deletes it
   await click(admin, '#endBtn');
@@ -338,26 +403,32 @@ console.log('\n--- group game');
   await admin.waitForSelector('.board-row');
   check('standings rank groups', (await admin.$$eval('.board-name', (n) => n.length)) === 2);
   await shot(admin, 'g-host-4-standings');
+
+  // a latecomer joins in the middle of the game and is placed in the smallest group
+  const hal = await open(`${BASE}/student.html?room=${code}&emulator`, phone, 'Hal');
+  await hal.waitForSelector('#joinForm');
+  await hal.type('#name', 'Hal');
+  await click(hal, '#joinBtn');
+  await hal.waitForSelector('.group-badge');
+  const halUid = (await playersByName(code)).Hal;
+  const halGroup = await rest(`quizzes/${code}/group/${halUid}`);
+  check('a latecomer is placed in a group mid-game', /^g[12]$/.test(halGroup ?? ''), halGroup);
+  await shot(hal, 'g-phone-7-latecomer');
+
   await click(admin, '#nextBtn');
   for (const n of names) await phones[n].waitForSelector('.dial-range');
   await click(admin, '#nextBtn'); // to the answers
+  await admin.waitForSelector('.p-question');
   await click(admin, '#nextBtn'); // reveal
+  await admin.waitForSelector('.p-verdict');
   await click(admin, '#nextBtn'); // standings
+  await hasText(admin, '.p-title', 'Almost there');
   await click(admin, '#nextBtn'); // final
+  await admin.waitForSelector('.podium');
   await phones[g1[0]].waitForSelector('.cal-list');
   check('group players get a report too', true);
   await shot(phones[g1[0]], 'g-phone-6-final');
 
-  // a latecomer joins the smallest group
-  const late = await join(code, 'Hal').catch(() => null);
-  check('a latecomer can still join a group game', !!late);
-  if (late) {
-    const uidHal = (await playersByName(code)).Hal;
-    await until(admin, () => true);
-    await sleep(800);
-    const g = await rest(`quizzes/${code}/group/${uidHal}`);
-    check('...and is placed in a group', /^g[12]$/.test(g ?? ''), g);
-  }
   await click(admin, '#endBtn');
   await admin.waitForSelector('dialog[open]');
   await admin.$eval('dialog[open] button[value="ok"]', (e) => e.click());
@@ -373,6 +444,17 @@ console.log('\n--- front page');
   await home.type('#code', 'zzz');
   await click(home, '#joinForm button[type="submit"]');
   check('a short code is rejected with a message', (await text(home, '#codeError')).includes('6 letters'));
+  await home.$eval('.dial-range', (el) => {
+    el.value = 100;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  // Chrome reports a mixed colour as color(srgb 1 0.36 0.36) and a plain one as rgb(255, 93, 93): read both as [r, g, b]
+  const rgb = (css) => (css.startsWith('color(') ? css.match(/[\d.]+/g).slice(-3).map((v) => Math.round(Number(v) * 255)) : css.match(/\d+/g).slice(0, 3).map(Number)).join();
+  const risk = async () => rgb(await home.$eval('.dial-pct', (e) => getComputedStyle(e).color));
+  check('a full wager turns the dial red on the black theme', (await risk()) === '255,93,93', await risk());
+  await home.$eval('input[name="theme"][value="light"]', (e) => e.click());
+  check('...and a deeper red on the light theme', (await risk()) === '198,40,40', await risk());
+  await shot(home, 'home-phone-light');
   const wide = await open(`${BASE}/index.html`, big, 'home-wide');
   await wide.waitForSelector('.dial-range');
   await shot(wide, 'home-wide');

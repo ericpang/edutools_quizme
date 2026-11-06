@@ -4,6 +4,7 @@ import { Room } from './room.js';
 import { isCode, normalizeCode } from './codes.js';
 import { groupColor, groupLabel } from './grouping.js';
 import { START_POINTS } from './scoring.js';
+import { mountTheme } from './theme.js';
 import { $, fill, fmt, frameThrottle, h, secondsLeft, store } from './ui.js';
 import { answerView, bidView, finalView, lobbyView, noticeView, revealView, standingsView } from './student-views.js';
 
@@ -285,4 +286,5 @@ function tick() {
   }
 }
 
+mountTheme($('#themeSlot'));
 boot();

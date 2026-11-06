@@ -3,7 +3,10 @@ import { signIn } from './firebase.js';
 import { Room } from './room.js';
 import { Host } from './host.js';
 import { toStored } from './quiz.js';
-import { $, confirmDialog, fill, frameThrottle, secondsLeft, store, toast } from './ui.js';
+import { ICON } from './shapes.js';
+import { createSounds } from './sounds.js';
+import { mountTheme } from './theme.js';
+import { $, confirmDialog, fill, frameThrottle, icon, secondsLeft, store, toast } from './ui.js';
 import { builderView } from './admin-builder.js';
 import { answerScreen, bidScreen, finalScreen, lobbyScreen, revealScreen, standingsScreen } from './admin-views.js';
 
@@ -11,6 +14,7 @@ const ROOM_KEY = 'qm.admin.room'; // the host's page is the game: a refresh must
 const stage = $('#stage');
 
 const A = { uid: null, room: null, host: null, joinUrl: '', joinLabel: '', key: null, view: null, span: 1 };
+const sounds = createSounds();
 
 // ---------------------------------------------------------------- start up
 async function boot() {
@@ -100,10 +104,12 @@ const render = frameThrottle(() => {
   const { cur } = state;
   const key = cur.phase === 'lobby' || cur.phase === 'final' ? cur.phase : `${cur.phase}:${cur.qid}`;
   if (key !== A.key) {
+    const wasBidding = A.key?.startsWith('bid:'); // a live change, not the page loading into a game in progress
     A.key = key;
     A.span = 1;
     A.view = BUILD[cur.phase]({ A, host: A.host });
     fill(stage, A.view.el);
+    if (cur.phase === 'answer' && wasBidding) sounds.question(cur.n); // the question appears: a cute fanfare
     $('#announce').textContent = { lobby: 'Lobby open.', bid: `Question ${cur.n}: place your wagers.`, answer: 'The question is out.', reveal: 'The answer is revealed.', standings: 'Standings.', final: 'Game over.' }[cur.phase];
   }
   A.view.update(state);
@@ -124,16 +130,19 @@ const render = frameThrottle(() => {
   }
 });
 
-// The countdown along the top of the stage. It only shows while the clock is running.
+// The countdown along the top of the stage. It only shows while the clock is running. The question's music plays for exactly
+// as long as the bar moves on the question (not during the wagers), and speeds up when the bar turns red.
+const LOW_MS = 5000;
 setInterval(() => {
   const cur = A.host?.state.cur;
   const running = cur && (cur.phase === 'bid' || cur.phase === 'answer') && cur.deadline;
   $('#timer').hidden = !running;
+  const left = running ? cur.deadline - A.host.serverNow() : 0;
+  sounds.music(Boolean(running) && cur.phase === 'answer' && left > 0, { n: cur?.n, hurry: left < LOW_MS });
   if (!running) return;
-  const left = cur.deadline - A.host.serverNow();
   A.span = Math.max(A.span, left, 1000);
   $('#timerFill').style.transform = `scaleX(${Math.max(0, Math.min(1, left / A.span))})`;
-  $('#timer').classList.toggle('is-low', left < 5000);
+  $('#timer').classList.toggle('is-low', left < LOW_MS);
   $('#timerNum').textContent = secondsLeft(cur.deadline, A.host.serverNow());
 }, 200);
 
@@ -159,6 +168,23 @@ $('#nextBtn').addEventListener('click', () => {
 $('#finishBtn').addEventListener('click', async () => {
   if (await confirmDialog({ title: 'Finish the game now?', text: 'The current question is dropped and players see the final results.', confirm: 'Finish game' })) A.host.finish();
 });
+// the sound switch (the choice is remembered on this device); turning it on plays the fanfare so the host can hear it works,
+// and brings the music back if a question is out
+function paintSound() {
+  const on = sounds.enabled;
+  const button = $('#soundBtn');
+  button.setAttribute('aria-pressed', String(on));
+  fill(button, icon(on ? ICON.sound : ICON.mute, { size: 18 }), on ? 'Sound on' : 'Sound off');
+}
+$('#soundBtn').addEventListener('click', () => {
+  sounds.setEnabled(!sounds.enabled);
+  paintSound();
+  if (sounds.enabled) sounds.question(A.host?.state.cur?.n);
+});
+document.addEventListener('pointerdown', () => sounds.unlock(), { once: true }); // browsers allow sound after the first click
+paintSound();
+mountTheme($('#themeSlot'));
+
 $('#endBtn').addEventListener('click', () => endGame('The game and everyone’s results are deleted for good.'));
 $('#fullscreenBtn').addEventListener('click', () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.()));
 
