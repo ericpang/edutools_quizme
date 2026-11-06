@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d3b45">
+  <title>QuizMe</title>
+  <meta name="description" content="A live classroom quiz that rewards calibrated confidence: wager before you see the options, climb back with a Safety Net, and bet on the crowd.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="land">
+    <header class="land-head"><a class="brand" href="index.html">QuizMe</a></header>
+
+    <section class="hero" aria-labelledby="heroTitle">
+      <h1 class="hero-title" id="heroTitle">Quiz your class on confidence, not speed.</h1>
+      <p class="lead">Players decide how much to risk before they see the options. Points follow accuracy and the wager, never the clock.</p>
+      <div class="hero-demo" id="demo"></div>
+      <p class="muted small">Try it: drag the dial. This is a medium question and a balance of 800 points.</p>
+    </section>
+
+    <section class="entry" aria-label="Join or host">
+      <form class="stack" id="joinForm" novalidate>
+        <h2 class="sub">Join a game</h2>
+        <label class="field">
+          <span>Game code</span>
+          <input id="code" class="input code-input" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABC234">
+        </label>
+        <p class="error" id="codeError" role="alert" hidden></p>
+        <button class="btn primary big" type="submit">Join game</button>
+      </form>
+      <div class="stack">
+        <h2 class="sub">Host a game</h2>
+        <p>Build a quiz, show the code on the big screen and run each round from there.</p>
+        <a class="btn big" href="admin.html">Set up a game</a>
+      </div>
+    </section>
+
+    <section class="how" aria-labelledby="howTitle">
+      <h2 class="sub" id="howTitle">Four ways it differs from a speed quiz</h2>
+      <ul class="twists">
+        <li><b>Confidence Bidding</b>Wager part of your points while you can only see the category and difficulty.</li>
+        <li><b>Safety Net</b>Players in the bottom 30% earn a one-time Double Down or Shield.</li>
+        <li><b>Side-bets</b>After you answer, see how the class is voting and bet on whether most got it right.</li>
+        <li><b>Group mode</b>Random teams vote on every wager and answer, and one captain breaks ties.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script type="module">
+    import { createDial } from './js/dial.js';
+    import { isCode, normalizeCode } from './js/codes.js';
+
+    document.getElementById('demo').append(createDial({ score: 800, difficulty: 'medium', value: 40 }).el);
+
+    const input = document.getElementById('code');
+    const error = document.getElementById('codeError');
+    document.getElementById('joinForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const code = normalizeCode(input.value);
+      if (!isCode(code)) {
+        error.textContent = 'The code has 6 letters and numbers, like ABC234.';
+        error.hidden = false;
+        input.focus();
+        return;
+      }
+      location.href = `student.html?room=${code}`;
+    });
+  </script>
+</body>
+</html>

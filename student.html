@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" class="player">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d3b45">
+  <title>QuizMe</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip" href="#view">Skip to the game</a>
+  <div class="screen">
+    <p class="banner" id="offline" role="status" hidden>Connection lost. Reconnecting…</p>
+    <header class="topbar" id="topbar" hidden>
+      <span class="who" id="who"></span>
+      <span class="bal"><small>Balance</small><b class="num" id="balance">1,000</b></span>
+    </header>
+    <div class="timer" id="timer" hidden role="timer" aria-label="Time left">
+      <span class="timer-bar"><span class="timer-fill" id="timerFill"></span></span>
+      <span class="timer-num num" id="timerNum"></span>
+    </div>
+    <main class="view" id="view" tabindex="-1">
+      <p class="muted">Connecting…</p>
+    </main>
+  </div>
+  <p class="sr-only" id="announce" aria-live="polite"></p>
+  <div class="toast" id="toast" role="status"></div>
+  <script type="module" src="js/student.js"></script>
+</body>
+</html>

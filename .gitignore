@@ -1,0 +1,4 @@
+node_modules/
+_site/
+tests/e2e/shots/
+*.log

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en" class="host">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d3b45">
+  <title>QuizMe: host</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Big+Shoulders+Display:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip" href="#stage">Skip to the game</a>
+  <header class="bar">
+    <a class="brand" href="index.html">QuizMe</a>
+    <div class="chips" id="chips" hidden>
+      <span class="chip">Code <b class="num" id="chipCode"></b></span>
+      <span class="chip"><b class="num" id="chipCount">0</b> <span id="chipUnit">players</span></span>
+    </div>
+    <div class="bar-actions" id="barActions" hidden>
+      <button class="btn small" id="fullscreenBtn" type="button">Full screen</button>
+      <button class="btn small danger" id="endBtn" type="button">End game</button>
+    </div>
+  </header>
+  <div class="timer is-big" id="timer" hidden role="timer" aria-label="Time left">
+    <span class="timer-bar"><span class="timer-fill" id="timerFill"></span></span>
+    <span class="timer-num num" id="timerNum"></span>
+  </div>
+  <p class="banner is-error" id="problem" role="alert" hidden></p>
+  <main class="stage" id="stage" tabindex="-1">
+    <p class="muted">Connecting…</p>
+  </main>
+  <footer class="controls" id="controls" hidden>
+    <span class="phase-label" id="phaseLabel"></span>
+    <span class="grow"></span>
+    <button class="btn" id="finishBtn" type="button">Finish game</button>
+    <button class="btn primary" id="nextBtn" type="button">Next</button>
+  </footer>
+  <p class="sr-only" id="announce" aria-live="polite"></p>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>
